@@ -1,41 +1,29 @@
-import { useState } from "react";
-import { Form, Link, redirect, useActionData } from "react-router";
+import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/login";
-
-const API_URL = process.env.API_URL ?? "http://localhost:3001";
+import { apiFetch } from "../lib/server";
 
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const email = String(form.get("email") ?? "");
   const password = String(form.get("password") ?? "");
+  const next = String(form.get("next") ?? "/dashboard");
   if (!email || !password) {
     return { error: "Email and password are required" };
   }
-  const res = await fetch(`${API_URL}/api/auth/sign-in/email`, {
+  const res = await apiFetch(request, "/api/auth/sign-in/email", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Origin: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
-    },
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) {
     const body = await res.text();
     return { error: body || "Sign-in failed" };
   }
-  // Forward Set-Cookie headers to the browser on this response
-  const setCookie = res.headers.get("set-cookie");
-  if (setCookie) {
-    // react-router v8 will forward response cookies; we just redirect.
-  }
-  return redirect("/dashboard", {
-    headers: setCookie ? { "set-cookie": setCookie } : undefined,
-  });
+  return redirect(next);
 }
 
-export default function Login() {
-  const data = useActionData<typeof action>();
-  const [submitting, setSubmitting] = useState(false);
+export default function Login({ actionData }: Route.ComponentProps) {
+  const nav = useNavigation();
+  const busy = nav.state === "submitting";
   return (
     <main className="mx-auto max-w-md px-6 py-20">
       <h1 className="text-3xl font-bold">Log in</h1>
@@ -45,11 +33,7 @@ export default function Login() {
           Sign up
         </Link>
       </p>
-      <Form
-        method="post"
-        className="mt-8 space-y-4"
-        onSubmit={() => setSubmitting(true)}
-      >
+      <Form method="post" className="mt-8 space-y-4">
         <div>
           <label className="block text-sm font-medium" htmlFor="email">
             Email
@@ -74,15 +58,13 @@ export default function Login() {
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
           />
         </div>
-        {data?.error && (
-          <p className="text-sm text-red-600">{data.error}</p>
-        )}
+        {actionData?.error && <p className="text-sm text-red-600">{actionData.error}</p>}
         <button
           type="submit"
-          disabled={submitting}
+          disabled={busy}
           className="w-full rounded-md bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-800 disabled:opacity-50"
         >
-          {submitting ? "Signing in…" : "Sign in"}
+          {busy ? "Signing in…" : "Sign in"}
         </button>
       </Form>
     </main>

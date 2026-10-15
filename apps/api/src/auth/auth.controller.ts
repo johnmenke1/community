@@ -4,9 +4,10 @@ import { auth } from "./auth.instance";
 
 @Controller("auth")
 export class AuthController {
-  // Catch-all for every better-auth route. We build a real fetch Request and
-  // pass through to better-auth's handler, then mirror the Response back.
-  @All("*")
+  // Catch-all for every better-auth route. The `*path` form (rather than `*`)
+  // silences path-to-regexp v8's "LegacyRouteConverter" deprecation warning;
+  // both forms match identically.
+  @All("*path")
   async handle(@Req() req: Request, @Res() res: Response) {
     try {
       const url = `${req.protocol}://${req.get("host")}${req.originalUrl}`;

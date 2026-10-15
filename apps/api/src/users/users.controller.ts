@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Req, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, ParseUUIDPipe, Req, UseGuards } from "@nestjs/common";
 import type { Request } from "express";
 import { UsersService } from "./users.service";
 import { AuthGuard } from "../auth/auth.guard";
@@ -16,9 +16,11 @@ export class UsersController {
     return this.users.findById(session!.userId);
   }
 
-  // Public profile lookup
+  // Public profile lookup. The ParseUUIDPipe returns 400 (not 500) when
+  // the id is not a valid UUID, so a request to /api/users/foo produces
+  // a clean error instead of a Postgres crash.
   @Get(":id")
-  async getOne(@Param("id") id: string) {
+  async getOne(@Param("id", ParseUUIDPipe) id: string) {
     return this.users.findById(id);
   }
 }

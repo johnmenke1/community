@@ -1,55 +1,38 @@
 import { Form, Link, redirect } from "react-router";
 import type { Route } from "./+types/dashboard";
+import { apiFetch, requireUser } from "../lib/server";
 
-const API_URL = process.env.API_URL ?? "http://localhost:3001";
-
-interface MeResponse {
+interface Community {
   id: string;
-  email: string;
+  slug: string;
   name: string;
+  description: string | null;
+  role: "owner" | "admin" | "member";
+  memberCount: number;
+  createdAt: string;
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const cookie = request.headers.get("cookie") ?? "";
-  // Validate session via the API's /api/users/me (which uses the auth guard)
-  const meRes = await fetch(`${API_URL}/api/users/me`, {
-    headers: { cookie },
-  });
-  if (meRes.status === 401) {
-    return redirect("/login");
-  }
-  if (!meRes.ok) {
-    // Forward to login on any auth failure
-    return redirect("/login");
-  }
-  const me = (await meRes.json()) as MeResponse;
-
-  // Realtime health (does not require auth)
-  let realtimeConfigured = false;
+  const me = await requireUser(request);
+  // Pull the user's communities. Tolerate errors so a transient api hiccup
+  // doesn't redirect the user back to /login.
+  let communities: Community[] = [];
   try {
-    const r = await fetch(`${API_URL}/api/realtime/health`);
-    if (r.ok) {
-      const j = (await r.json()) as { configured: boolean };
-      realtimeConfigured = Boolean(j.configured);
-    }
+    const res = await apiFetch(request, "/api/communities/mine");
+    if (res.ok) communities = (await res.json()) as Community[];
   } catch {
-    // ignore — show "not configured" if API is down
+    // ignore
   }
-
-  return { me, realtimeConfigured };
+  return { me, communities };
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const cookie = request.headers.get("cookie") ?? "";
-  await fetch(`${API_URL}/api/auth/sign-out`, {
-    method: "POST",
-    headers: { cookie },
-  });
-  return redirect("/login");
+  await apiFetch(request, "/api/auth/sign-out", { method: "POST" });
+  return redirect("/");
 }
 
 export default function Dashboard({ loaderData }: Route.ComponentProps) {
-  const { me, realtimeConfigured } = loaderData;
+  const { me, communities } = loaderData;
   return (
     <main className="mx-auto max-w-3xl px-6 py-16">
       <header className="flex items-center justify-between">
@@ -63,30 +46,67 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
           </button>
         </Form>
       </header>
-      <section className="mt-10 rounded-lg border border-slate-200 bg-white p-6">
+
+      <section className="mt-8 rounded-lg border border-slate-200 bg-white p-6">
         <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
           Signed in as
         </h2>
         <p className="mt-2 text-2xl font-semibold">{me.name}</p>
         <p className="mt-1 text-slate-600">{me.email}</p>
       </section>
+
       <section className="mt-6 rounded-lg border border-slate-200 bg-white p-6">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-          Realtime health
-        </h2>
-        <p className="mt-2 text-2xl font-semibold">
-          {realtimeConfigured ? (
-            <span className="text-emerald-600">configured</span>
-          ) : (
-            <span className="text-amber-600">not configured</span>
-          )}
-        </p>
-        <p className="mt-2 text-sm text-slate-500">
-          RealtimeKit is stubbed in commit 1. Wire in commit 2.
-        </p>
-        <Link to="/" className="mt-4 inline-block text-sm underline">
-          Back to home
-        </Link>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
+            Your communities
+          </h2>
+          <div className="flex gap-2">
+            <Link
+              to="/c"
+              className="text-sm underline"
+            >
+              Browse all
+            </Link>
+            <Link
+              to="/c/new"
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              New community
+            </Link>
+          </div>
+        </div>
+        {communities.length === 0 ? (
+          <p className="mt-4 text-slate-500">
+            You're not in any communities yet.{" "}
+            <Link to="/c" className="underline">
+              Browse communities
+            </Link>{" "}
+            or create one.
+          </p>
+        ) : (
+          <ul className="mt-4 divide-y divide-slate-200">
+            {communities.map((c) => (
+              <li key={c.id} className="py-3">
+                <Link to={`/c/${c.slug}`} className="block hover:bg-slate-50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold">{c.name}</p>
+                      <p className="text-sm text-slate-500">
+                        {c.description ?? "No description"}
+                      </p>
+                    </div>
+                    <div className="text-right text-xs text-slate-500">
+                      <p className="rounded bg-slate-100 px-2 py-0.5 uppercase">
+                        {c.role}
+                      </p>
+                      <p className="mt-1">{c.memberCount} members</p>
+                    </div>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </main>
   );
