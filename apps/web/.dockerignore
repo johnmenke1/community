@@ -1,0 +1,16 @@
+node_modules
+build
+.react-router
+.git
+.env
+.env.local
+.env.*.local
+.gitignore
+.dockerignore
+README.md
+*.md
+.eslintrc.cjs
+react-router.config.ts
+vite.config.ts
+tsconfig*.json
+coverage

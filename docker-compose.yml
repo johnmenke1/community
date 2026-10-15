@@ -1,0 +1,74 @@
+name: community
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: community-postgres
+    environment:
+      POSTGRES_USER: community
+      POSTGRES_PASSWORD: community
+      POSTGRES_DB: community
+    ports:
+      - "5432:5432"
+    volumes:
+      - community-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U community -d community"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - community-network
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: community-mailhog
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    networks:
+      - community-network
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: community-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://community:community@postgres:5432/community
+      CF_ACCOUNT_ID: ${CF_ACCOUNT_ID:-}
+      CF_REALTIMEKIT_TOKEN: ${CF_REALTIMEKIT_TOKEN:-}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-secret-change-me-in-prod-1234567890}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      API_PORT: 3001
+      WEB_PORT: 3000
+      NODE_ENV: production
+    ports:
+      - "3001:3001"
+    networks:
+      - community-network
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: community-web
+    depends_on:
+      - api
+    environment:
+      API_PORT: 3000
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    networks:
+      - community-network
+
+networks:
+  community-network:
+    driver: bridge
+
+volumes:
+  community-pgdata:

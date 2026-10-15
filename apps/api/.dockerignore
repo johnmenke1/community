@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.env
+.env.local
+.env.*.local
+.gitignore
+.dockerignore
+README.md
+*.md
+.eslintrc.cjs
+nest-cli.json
+tsconfig*.json
+coverage
