@@ -1,6 +1,6 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/login";
-import { apiFetch } from "../lib/server";
+import { apiFetch, forwardSetCookies } from "../lib/server";
 
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
@@ -18,7 +18,10 @@ export async function action({ request }: Route.ActionArgs) {
     const body = await res.text();
     return { error: body || "Sign-in failed" };
   }
-  return redirect(next);
+  // Forward the api's Set-Cookie (the session token) to the browser —
+  // otherwise the session is created on the api but the browser stays
+  // anonymous and the redirect lands on /login again.
+  return redirect(next, { headers: forwardSetCookies(res) });
 }
 
 export default function Login({ actionData }: Route.ComponentProps) {

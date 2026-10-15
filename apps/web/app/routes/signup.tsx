@@ -1,6 +1,6 @@
 import { Form, Link, redirect, useActionData, useNavigation } from "react-router";
 import type { Route } from "./+types/signup";
-import { apiFetch } from "../lib/server";
+import { apiFetch, forwardSetCookies } from "../lib/server";
 
 export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
@@ -18,7 +18,7 @@ export async function action({ request }: Route.ActionArgs) {
     const body = await res.text();
     return { error: body || "Sign-up failed" };
   }
-  return redirect("/dashboard");
+  return redirect("/dashboard", { headers: forwardSetCookies(res) });
 }
 
 export default function Signup() {

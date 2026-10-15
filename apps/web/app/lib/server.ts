@@ -83,3 +83,32 @@ export async function apiFetch(
 }
 
 export { API_URL };
+
+/**
+ * Extracts Set-Cookie headers from an api Response so the action can
+ * forward them to the browser. Without this, signing in via the web
+ * action (which calls better-auth on the api) would create a session
+ * on the api but never set the cookie on the user's browser.
+ *
+ * Usage:
+ *   const res = await apiFetch(request, "/api/auth/sign-in/email", {...});
+ *   if (!res.ok) return { error: await res.text() };
+ *   return redirect(next, { headers: forwardSetCookies(res) });
+ */
+export function forwardSetCookies(apiResponse: Response): Headers {
+  const out = new Headers();
+  // getSetCookie() returns an array of every Set-Cookie value, even when
+  // multiple were set. It's the spec-blessed way to read them (the
+  // header is intentionally not comma-joined because dates can contain
+  // commas). Node 20+ and modern browsers both support it.
+  const setCookies =
+    typeof apiResponse.headers.getSetCookie === "function"
+      ? apiResponse.headers.getSetCookie()
+      : (apiResponse.headers.get("set-cookie")
+          ? [apiResponse.headers.get("set-cookie") as string]
+          : []);
+  for (const c of setCookies) {
+    if (c) out.append("Set-Cookie", c);
+  }
+  return out;
+}
