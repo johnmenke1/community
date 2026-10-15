@@ -42,6 +42,14 @@ export const auth = betterAuth({
   },
   trustedOrigins: [
     process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+    // In dev, the web app can run on any port (3000, 13000, etc.) while
+    // talking to the api. Better-auth only requires the Origin to match a
+    // trustedOrigins entry or the baseURL. The localhost wildcard covers
+    // the common dev cases; production sets BETTER_AUTH_URL to the
+    // canonical web origin and the wildcard is a no-op.
+    ...(process.env.NODE_ENV !== "production"
+      ? ["http://localhost:3000", "http://localhost:13000", "http://127.0.0.1:3000", "http://127.0.0.1:13000"]
+      : []),
   ],
 });
 

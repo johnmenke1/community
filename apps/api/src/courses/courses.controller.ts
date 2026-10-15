@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   Param,
   Post,
   Req,
@@ -27,6 +28,63 @@ function userId(req: Request): string {
 @Controller()
 export class CoursesController {
   constructor(private readonly courses: CoursesService) {}
+
+  // GET /api/communities/:slug/courses
+  // Course list with lesson counts (member-only).
+  @Get("communities/:slug/courses")
+  @UseGuards(AuthGuard)
+  list(@Param("slug") slug: string, @Req() req: Request) {
+    return this.courses.listWithCounts(slug, userId(req));
+  }
+
+  // GET /api/communities/:slug/courses/:courseSlug
+  // Course detail with the ordered lesson list (member-only). The lesson
+  // player fetches a single lesson via the endpoint below.
+  @Get("communities/:slug/courses/:courseSlug")
+  @UseGuards(AuthGuard)
+  async getOne(
+    @Param("slug") slug: string,
+    @Param("courseSlug") courseSlug: string,
+    @Req() req: Request
+  ) {
+    const c = await this.courses.getBySlug(slug, courseSlug, userId(req));
+    return {
+      id: c.id,
+      slug: c.slug,
+      title: c.title,
+      description: c.description,
+      createdAt: c.createdAt,
+      // Drop the lesson content from the sidebar payload — only nav metadata
+      // is needed. The player page fetches the full content per-lesson.
+      lessons: c.lessons.map((l) => ({
+        id: l.id,
+        slug: l.slug,
+        title: l.title,
+        order: l.order,
+      })),
+    };
+  }
+
+  // GET /api/communities/:slug/courses/:courseSlug/lessons/:lessonSlug
+  // Single lesson (member-only). Returns the lesson with its rendered-safe
+  // markdown content and prev/next pointers.
+  @Get(
+    "communities/:slug/courses/:courseSlug/lessons/:lessonSlug"
+  )
+  @UseGuards(AuthGuard)
+  async getLesson(
+    @Param("slug") slug: string,
+    @Param("courseSlug") courseSlug: string,
+    @Param("lessonSlug") lessonSlug: string,
+    @Req() req: Request
+  ) {
+    return this.courses.getLesson(
+      slug,
+      courseSlug,
+      lessonSlug,
+      userId(req)
+    );
+  }
 
   @Post("communities/:slug/courses")
   @UseGuards(AuthGuard)

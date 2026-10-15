@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import {
   courses,
   lessons,
@@ -35,6 +35,46 @@ export class CoursesService {
       .orderBy(asc(courses.createdAt));
   }
 
+  /**
+   * Course list with lesson counts. Single query per table, grouped
+   * in JS — the typical case is 1-20 courses per community so the
+   * listLessons-style inner query is fine. If usage shows hot
+   * communities with hundreds of courses, swap for a SQL grouped
+   * count via `count()` + `groupBy(courseId)`.
+   */
+  async listWithCounts(communitySlug: string, viewerId: string) {
+    const community = await this.communities.getBySlug(communitySlug);
+    await this.communities.assertMember(community.id, viewerId);
+    const allCourses = await this.db
+      .select()
+      .from(courses)
+      .where(eq(courses.communityId, community.id))
+      .orderBy(asc(courses.createdAt));
+    if (allCourses.length === 0) return [];
+    const counts = await this.db
+      .select({
+        courseId: lessons.courseId,
+        lessonCount: sql<number>`count(*)::int`,
+      })
+      .from(lessons)
+      .where(
+        inArray(
+          lessons.courseId,
+          allCourses.map((c) => c.id)
+        )
+      )
+      .groupBy(lessons.courseId);
+    const countMap = new Map(counts.map((r) => [r.courseId, r.lessonCount]));
+    return allCourses.map((c) => ({
+      id: c.id,
+      slug: c.slug,
+      title: c.title,
+      description: c.description,
+      createdAt: c.createdAt,
+      lessonCount: countMap.get(c.id) ?? 0,
+    }));
+  }
+
   async getBySlug(communitySlug: string, courseSlug: string, viewerId: string) {
     const community = await this.communities.getBySlug(communitySlug);
     await this.communities.assertMember(community.id, viewerId);
@@ -55,6 +95,39 @@ export class CoursesService {
       .where(eq(lessons.courseId, rows[0].id))
       .orderBy(asc(lessons.order));
     return { ...rows[0], lessons: courseLessons };
+  }
+
+  async listLessons(communitySlug: string, courseSlug: string, viewerId: string) {
+    const course = await this.getBySlug(communitySlug, courseSlug, viewerId);
+    return course.lessons;
+  }
+
+  async getLesson(
+    communitySlug: string,
+    courseSlug: string,
+    lessonSlug: string,
+    viewerId: string
+  ) {
+    const course = await this.getBySlug(communitySlug, courseSlug, viewerId);
+    const row = course.lessons.find((l) => l.slug === lessonSlug);
+    if (!row) throw new NotFoundException("Lesson not found");
+    // Compute prev/next within the course for nav arrows.
+    const idx = course.lessons.findIndex((l) => l.id === row.id);
+    const prev = idx > 0 ? course.lessons[idx - 1] : null;
+    const next =
+      idx >= 0 && idx < course.lessons.length - 1
+        ? course.lessons[idx + 1]
+        : null;
+    return {
+      ...row,
+      course: {
+        id: course.id,
+        slug: course.slug,
+        title: course.title,
+      },
+      prev,
+      next,
+    };
   }
 
   async create(

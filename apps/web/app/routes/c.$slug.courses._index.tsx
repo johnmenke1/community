@@ -8,6 +8,7 @@ interface Course {
   title: string;
   description: string | null;
   createdAt: string;
+  lessonCount: number;
 }
 
 interface Community {
@@ -112,6 +113,9 @@ export default function CourseList({ loaderData }: Route.ComponentProps) {
                 <p className="font-semibold">{c.title}</p>
                 <p className="mt-1 text-sm text-slate-500">
                   {c.description ?? "No description"}
+                </p>
+                <p className="mt-2 text-xs text-slate-400">
+                  {c.lessonCount} {c.lessonCount === 1 ? "lesson" : "lessons"}
                 </p>
               </Link>
             </li>

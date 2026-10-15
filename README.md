@@ -1,8 +1,8 @@
 # community
 
-A self-hostable community platform: live audio/video rooms (RealtimeKit), communities, posts feed, and courses.
+A self-hostable community platform: live audio/video rooms (RealtimeKit), communities, posts feed, and courses with a markdown lesson player.
 
-> **Status: v0.2.** Communities, posts feed, RealtimeKit rooms, course scaffolding, and the 4 v0.1 polish items are all live. Stripe payments and email notifications are out of scope; courses have table + API but no player UI (the client builds the player against `/api/communities/:slug/courses` and `.../lessons` in commit 3).
+> **Status: v0.3.** Communities, posts, RealtimeKit rooms, and the full course player (markdown lessons, sidebar nav, prev/next) are all live. Stripe and email notifications are out of scope; CI now spins up Postgres to catch schema bugs on every PR.
 
 ## Stack
 
@@ -53,7 +53,8 @@ pnpm dev
 | Create community, view list, join, leave | ✅ |
 | Create post, view feed, react (like/love/insightful), soft-delete | ✅ |
 | Real-time rooms (RealtimeKit Cloudflare API, lazy session creation) | ✅ (requires `CF_REALTIMEKIT_TOKEN` + `CF_ACCOUNT_ID`) |
-| Courses + lessons schema & API | ✅ (UI shows empty state with API docs) |
+| Courses + lessons with markdown player | ✅ (server-side rendered, sanitized) |
+| Owner lesson authoring (UI form) | ✅ (add lesson button on the course page) |
 | Membership guards on all community-scoped routes | ✅ |
 | Role guards (owner/admin/member) on create/update/delete | ✅ |
 | `ParseUUIDPipe` on user `:id` route | ✅ (no more 500 on `/api/users/foo`) |
@@ -91,9 +92,12 @@ GET    /api/communities/:slug/rooms               # list rooms (member)
 POST   /api/communities/:slug/rooms               # create room (admin)
 POST   /api/rooms/:id/join                        # issue RealtimeKit token (member)
 
+GET    /api/communities/:slug/courses             # list courses + lesson counts (member)
 POST   /api/communities/:slug/courses             # create course (admin)
+GET    /api/communities/:slug/courses/:courseSlug # course detail + ordered lessons (member)
 DELETE /api/communities/:slug/courses/:courseSlug # delete course (admin)
-POST   /api/communities/:slug/courses/:courseSlug/lessons  # add lesson (admin)
+POST   /api/communities/:slug/courses/:courseSlug/lessons              # add lesson (admin)
+GET    /api/communities/:slug/courses/:courseSlug/lessons/:lessonSlug  # single lesson + prev/next (member)
 ```
 
 ## Verifying it works
@@ -177,15 +181,22 @@ curl -X POST http://localhost:3001/api/auth/sign-up/email \
 - **Postgres** can be a managed DB or self-hosted behind a Cloudflare Tunnel.
 - **RealtimeKit** runs on Cloudflare's edge; the API mints short-lived meeting tokens (1h TTL).
 
-## What's NOT in v0.2 (deferred)
+## What's NOT in v0.3 (deferred)
 
 - **Stripe paid memberships** — the `memberships` table has `stripe_customer_id` and `stripe_subscription_id` columns ready, but no Stripe SDK, no webhook, no UI
 - **Email notifications** — MailHog is wired in docker-compose but no transactional email templates (verification, post notifications, etc.)
-- **Course player UI** — schema, API, and admin CRUD are done; the actual lesson viewer is the client's commit 3 work
+- **Lesson edit / delete UI** — admin can add lessons via the form; editing and deleting existing lessons is API-only (`POST`/`DELETE` endpoints; no UI yet). Drag-to-reorder is also deferred.
+- **Lesson progress tracking** — no "mark complete" or "last viewed" state yet
 - **Scheduled rooms, room recordings** — rooms are ephemeral ("start a room, join, done")
 - **In-app notifications / DMs / search / mentions** — out of scope
 - **Multi-tenancy / organizations** — single community hierarchy only
 
 ## CI
 
-`.github/workflows/ci.yml` runs `pnpm install --frozen-lockfile` + `turbo lint build` on push to `main` and on PRs.
+`.github/workflows/ci.yml` runs on push to `main` and on PRs:
+- Spins up `postgres:16-alpine` as a service
+- `pnpm install --frozen-lockfile`
+- `pnpm db:migrate` against the service
+- `pnpm turbo lint`
+- `pnpm turbo build`
+- Boots the api and hits `/api/health` to catch runtime boot errors

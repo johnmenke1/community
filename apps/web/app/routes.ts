@@ -13,6 +13,14 @@ export default [
   route("c/:slug/courses", "routes/c.$slug.courses._index.tsx"),
   route("c/:slug/courses/new", "routes/c.$slug.courses.new.tsx"),
   route("c/:slug/courses/:courseSlug", "routes/c.$slug.courses.$courseSlug.tsx"),
+  route(
+    "c/:slug/courses/:courseSlug/lessons/new",
+    "routes/c.$slug.courses.$courseSlug.lessons.new.tsx"
+  ),
+  route(
+    "c/:slug/courses/:courseSlug/lessons/:lessonSlug",
+    "routes/c.$slug.courses.$courseSlug.lessons.$lessonSlug.tsx"
+  ),
   route("c/:slug/room/new", "routes/c.$slug.room.new.tsx"),
   route("c/:slug/room/:id", "routes/c.$slug.room.$id.tsx"),
 ] satisfies RouteConfig;
