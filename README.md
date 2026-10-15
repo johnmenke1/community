@@ -2,7 +2,7 @@
 
 A self-hostable community platform: live audio/video rooms (RealtimeKit), communities, posts feed, and courses with a markdown lesson player.
 
-> **Status: v0.3.** Communities, posts, RealtimeKit rooms, and the full course player (markdown lessons, sidebar nav, prev/next) are all live. Stripe and email notifications are out of scope; CI now spins up Postgres to catch schema bugs on every PR.
+> **Status: v0.4.** v0.3's course player is live, plus a seeded "The Parent Project" demo community (1 community, 6 members, 3 courses, 8 lessons, 6 posts, 1 live room) ready for client demos. Stripe and email notifications remain out of scope.
 
 ## Stack
 
@@ -32,11 +32,16 @@ docker compose up -d postgres mailhog
 # 3. Apply Drizzle migrations
 pnpm db:migrate
 
-# 4. Copy env files and fill in secrets (only first time)
+# 4. (Optional) Seed the demo community "The Parent Project"
+#    — 6 members, 3 courses with real lessons, 6 posts, 1 live room.
+#    See DEMO.md for the walkthrough script.
+pnpm db:seed
+
+# 5. Copy env files and fill in secrets (only first time)
 cp apps/api/.env.example apps/api/.env.local
 # edit apps/api/.env.local — set BETTER_AUTH_SECRET, CF_ACCOUNT_ID, CF_REALTIMEKIT_TOKEN (token optional)
 
-# 5. Run api + web in parallel
+# 6. Run api + web in parallel
 pnpm dev
 ```
 
@@ -181,7 +186,7 @@ curl -X POST http://localhost:3001/api/auth/sign-up/email \
 - **Postgres** can be a managed DB or self-hosted behind a Cloudflare Tunnel.
 - **RealtimeKit** runs on Cloudflare's edge; the API mints short-lived meeting tokens (1h TTL).
 
-## What's NOT in v0.3 (deferred)
+## What's NOT in v0.4 (deferred)
 
 - **Stripe paid memberships** — the `memberships` table has `stripe_customer_id` and `stripe_subscription_id` columns ready, but no Stripe SDK, no webhook, no UI
 - **Email notifications** — MailHog is wired in docker-compose but no transactional email templates (verification, post notifications, etc.)
